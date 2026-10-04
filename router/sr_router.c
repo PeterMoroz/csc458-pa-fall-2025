@@ -10,6 +10,7 @@
 #include "sr_utils.h"
 
 #include "arp.h"
+#include "ip.h"
 
 /*---------------------------------------------------------------------
  * Method: sr_init(void)
@@ -68,6 +69,7 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
   print_hdrs(packet, len);
 
   if (ethertype(packet) == ethertype_ip) {
+    handle_ip(sr, packet, len, interface);
     return ;
   }
 

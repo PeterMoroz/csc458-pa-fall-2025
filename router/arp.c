@@ -61,6 +61,30 @@ void handle_arp(struct sr_instance *sr, uint8_t *packet,
     }
 }
 
+void compose_arp_request(uint8_t* packet, uint8_t* sender_hw_addr, 
+                        uint32_t sender_ip_addr, uint32_t target_ip_addr)
+{
+    sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
+    /*
+    static uint8_t bcast_mac[ETHER_ADDR_LEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+    memcpy(eh->ether_dhost, bcast_mac, ETHER_ADDR_LEN);    
+    */
+    memset(eh->ether_dhost, 0xFF, ETHER_ADDR_LEN);
+    memcpy(eh->ether_shost, sender_hw_addr, ETHER_ADDR_LEN);
+    eh->ether_type = htons(ethertype_arp);
+
+    sr_arp_hdr_t* arph = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+    arph->ar_hln = ETHER_ADDR_LEN;
+    arph->ar_hrd = htons(arp_hrd_ethernet);
+    arph->ar_op = htons(arp_op_request);
+    arph->ar_pln = sizeof(uint32_t);
+    arph->ar_pro = htons(ethertype_ip);
+    memcpy(arph->ar_sha, sender_hw_addr, ETHER_ADDR_LEN);
+    arph->ar_sip = sender_ip_addr;
+    memset(arph->ar_tha, 0, ETHER_ADDR_LEN);
+    arph->ar_tip = target_ip_addr;
+}
+
 
 static void handle_arp_request(struct sr_instance *sr, 
         uint8_t *packet, unsigned int len, char *interface)
