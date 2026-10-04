@@ -9,6 +9,8 @@
 #include "sr_rt.h"
 #include "sr_utils.h"
 
+#include "arp.h"
+
 /*---------------------------------------------------------------------
  * Method: sr_init(void)
  * Scope:  Global
@@ -52,6 +54,7 @@ void sr_init(struct sr_instance *sr) {
  *
  *---------------------------------------------------------------------*/
 
+
 void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
                      unsigned int len, char *interface /* lent */) {
   /* REQUIRES */
@@ -62,5 +65,14 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
   printf("*** -> Received packet of length %d \n", len);
 
   /* fill in code here */
+  print_hdrs(packet, len);
 
+  if (ethertype(packet) == ethertype_ip) {
+    return ;
+  }
+
+  if (ethertype(packet) == ethertype_arp) {
+    handle_arp(sr, packet, len, interface);
+    return ;
+  }
 } /* end sr_ForwardPacket */
