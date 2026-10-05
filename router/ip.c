@@ -65,7 +65,7 @@ void handle_ip(struct sr_instance *sr, uint8_t *packet,
 
         sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
         send_icmp_message(sr, interface, icmp_time_exceeded, 0,
-                        eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
+                        eh->ether_shost, iph->ip_src);
         return ;
     }
 
@@ -77,7 +77,7 @@ void handle_ip(struct sr_instance *sr, uint8_t *packet,
         if (icmph->icmp_type == icmp_echo) {
             sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
             send_icmp_message(sr, interface, icmp_echo_reply, 0,
-                            eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
+                            eh->ether_shost, iph->ip_src);
             return ;
         }
 
@@ -88,7 +88,7 @@ void handle_ip(struct sr_instance *sr, uint8_t *packet,
     if (iph->ip_p == ip_protocol_tcp || iph->ip_p == ip_protocol_udp) {
         sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
         send_icmp_message(sr, interface, icmp_dest_unreachable, icmp_port_unreachable,
-                        eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
+                        eh->ether_shost, iph->ip_src);
     }
 }
 
@@ -156,7 +156,7 @@ static void forward_ip_packet(struct sr_instance *sr, uint8_t *packet,
                 sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
                 iph = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
                 send_icmp_message(sr, interface, icmp_dest_unreachable, icmp_host_unreachable,
-                                eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
+                                eh->ether_shost, iph->ip_src);
                 return ;
             }
 
@@ -177,7 +177,7 @@ static void forward_ip_packet(struct sr_instance *sr, uint8_t *packet,
 
     sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
     send_icmp_message(sr, interface, icmp_dest_unreachable, icmp_net_unreachable,
-                    eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
+                    eh->ether_shost, iph->ip_src);
 }
 
 static struct sr_rt* lookup_rt_entry(struct sr_rt *table, uint32_t ipaddr)
