@@ -11,7 +11,8 @@
 #include "sr_if.h"
 
 
-static void compose_icmp_message(uint8_t* packet, uint8_t type, uint8_t code,
+static void compose_icmp_message(uint8_t* packet, 
+        uint8_t type, uint8_t code, void* data, 
         uint32_t src_ip, uint8_t* src_mac, uint32_t dst_ip, uint8_t* dst_mac)
 {
     sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
@@ -31,23 +32,26 @@ static void compose_icmp_message(uint8_t* packet, uint8_t type, uint8_t code,
     iph->ip_tos = 0;
     iph->ip_ttl = 64;
     iph->ip_v = 4;
-    iph->ip_sum = cksum(iph, sizeof(sr_icmp_hdr_t));
+    iph->ip_sum = cksum(iph, sizeof(sr_ip_hdr_t));
 
-    sr_icmp_hdr_t* icmph = (sr_icmp_hdr_t *)(packet 
-                        + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+    sr_icmp_t3_hdr_t* icmph = (sr_icmp_t3_hdr_t *)(packet 
+                            + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
     icmph->icmp_code = code;
     icmph->icmp_type = type;
+    if (data != NULL) {
+        memcpy(icmph->data, data, ICMP_DATA_SIZE);
+    }
     icmph->icmp_sum = 0;
-    icmph->icmp_sum = cksum(icmph, sizeof(icmph));
+    icmph->icmp_sum = cksum(icmph, sizeof(sr_icmp_t3_hdr_t));
 }
 
 void send_icmp_message(struct sr_instance *sr, char *interface,
-                        uint8_t type, uint8_t code,
+                        uint8_t type, uint8_t code, void* data,
                         uint8_t *dst_mac, uint32_t dst_ip)
 {
     uint8_t icmp_packet[sizeof(sr_ethernet_hdr_t) + 
-                        sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t)];
+                        sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t)];
     memset(icmp_packet, 0, sizeof(icmp_packet));
 
     struct sr_if *iface = sr_get_interface(sr, interface);
@@ -56,11 +60,11 @@ void send_icmp_message(struct sr_instance *sr, char *interface,
         return;
     }
 
-    compose_icmp_message(icmp_packet, type, code, 
+    compose_icmp_message(icmp_packet, type, code, data,
                         iface->ip, iface->addr, dst_ip, dst_mac);
 
     size_t icmp_packet_len = sizeof(sr_ethernet_hdr_t) + 
-                        sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t);
+                sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
 
     fprintf(stderr, " -- ICMP message \n");
     print_hdrs(icmp_packet, icmp_packet_len);

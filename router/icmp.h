@@ -18,8 +18,14 @@ enum icmp_dst_unreach_code {
     icmp_port_unreachable = 3,
 };
 
+/* Send ICMP message with given type, code and data (optional) to specified destination.
+  When data is not NULL, it should point to the data which will be used as payload of 
+  ICMP message. The size of these data must be equal ICMP_DATA_SIZE (see sr_protocol.h). 
+  In case of error messages payload contains IP header of the original packet that 
+  triggered error and few bytes followed it.
+*/
 void send_icmp_message(struct sr_instance *sr, char *interface,
-                        uint8_t type, uint8_t code,
-                        uint8_t *dst_mac, uint32_t dst_ip);
+                    uint8_t type, uint8_t code, void* data,
+                    uint8_t *dst_mac, uint32_t dst_ip);
 
 #endif
