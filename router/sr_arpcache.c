@@ -13,12 +13,50 @@
 #include "sr_protocol.h"
 #include "sr_router.h"
 
+#include "arp.h"
+#include "sr_utils.h"
+#include <assert.h>
+
+
 /*
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
   See the comments in the header file for an idea of what it should look like.
 */
-void sr_arpcache_sweepreqs(struct sr_instance *sr) { /* Fill this in */ }
+void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
+  /* Fill this in */ 
+
+  time_t now = time(NULL);
+  struct sr_arpreq *req = sr->cache.requests;
+  while (req != NULL) {
+    struct sr_arpreq *next = req->next;
+    if (req->times_sent >= 5) {
+      sr_arpreq_destroy(&sr->cache, req);
+    } else if (difftime(now, req->sent) >= 1.0) {
+
+      /* assume that all queued packets should be sent via the same interface */
+      struct sr_packet* pkt = req->packets;
+      assert(pkt);
+      
+      struct sr_if *iface = sr_get_interface(sr, pkt->iface);
+      if (iface == NULL) {
+          fprintf(stderr, "sweepreqs - could not find interface '%s'\n", pkt->iface);
+      } else {
+        uint8_t arp_request[sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)] = { '\0'};
+        memset(arp_request, 0, sizeof(arp_request));
+
+        compose_arp_request(arp_request, iface->addr, iface->ip, req->ip); 
+
+        fprintf(stderr, " -- ARP request \n");
+        print_hdrs(arp_request, sizeof(arp_request));
+        fprintf(stderr, " -- ARP request -- \n\n");
+
+        sr_send_packet(sr, arp_request, sizeof(arp_request), pkt->iface);      
+      }
+    }
+    req = next;
+  }
+}
 
 /* You should not need to touch the rest of this code. */
 
