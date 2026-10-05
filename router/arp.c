@@ -128,16 +128,16 @@ static void handle_arp_reply(struct sr_instance *sr,
 
     if (arpreq != NULL) {
         /* validate request */
-        if ((arpreq->ip != arph->ar_sip) || (arpreq->times_sent >= 5)) {
+        if ((arpreq->ip != arph->ar_sip) || (arpreq->times_sent > 5)) {
             fprintf(stderr, "handle ARP reply - wrong arpreq found \n" 
                 "IP %d.%d.%d.%d, times send %u\n\n",
                 ((arpreq->ip >> 0) & 0xFF), ((arpreq->ip >> 8) & 0xFF), 
                 ((arpreq->ip >> 16) & 0xFF), ((arpreq->ip >> 24) & 0xFF), 
                 arpreq->times_sent);
-            free(arpreq);
+            sr_arpreq_destroy(&sr->cache, arpreq);
             return;
         }
-        
+
         fprintf(stderr, "handle ARP reply - send queued packets\n");
         struct sr_packet *pkt = arpreq->packets;
         while (pkt != NULL) {
@@ -148,16 +148,12 @@ static void handle_arp_reply(struct sr_instance *sr,
             print_hdrs(pkt->buf, pkt->len);
             fprintf(stderr, "-- packet headers --\n\n");
             sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
-            
-            struct sr_packet* next = pkt->next;
 
-            free(pkt->buf);
-            free(pkt->iface);
-            free(pkt);
+            struct sr_packet* next = pkt->next;
             pkt = next;
         }
 
-        free(arpreq);
+        sr_arpreq_destroy(&sr->cache, arpreq);
     }
 }
 

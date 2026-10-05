@@ -1,5 +1,6 @@
 #include "ip.h"
 #include "arp.h"
+#include "icmp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,7 @@ static void forward_ip_packet(struct sr_instance *sr, uint8_t *packet,
                                 unsigned int len, char *interface);
 
 static struct sr_rt* lookup_rt_entry(struct sr_rt *table, uint32_t ipaddr);
+
 
 void handle_ip(struct sr_instance *sr, uint8_t *packet,
                 unsigned int len, char *interface)
@@ -61,18 +63,32 @@ void handle_ip(struct sr_instance *sr, uint8_t *packet,
             return;
         }
 
-        /* TO DO: send ICMP message 'time exceeded' (type: 11, code: 0) */
+        sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
+        send_icmp_message(sr, interface, icmp_time_exceeded, 0,
+                        eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
         return ;
     }
 
     if (iph->ip_p == ip_protocol_icmp) {
-        /* TO DO: 
-            1. check if message is 'echo request (type: , code: )
-            2. send ICMP message 'echo reply' (type: 0, code: doesn't matter) */
+
+        sr_icmp_hdr_t* icmph = (sr_icmp_hdr_t *)(packet 
+                            + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+        if (icmph->icmp_type == icmp_echo) {
+            sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
+            send_icmp_message(sr, interface, icmp_echo_reply, 0,
+                            eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
+            return ;
+        }
+
+        fprintf(stderr, "handle IP - unsupported ICMP message type %d\n", icmph->icmp_type);
+        return;
     }
 
     if (iph->ip_p == ip_protocol_tcp || iph->ip_p == ip_protocol_udp) {
-        /* TO DO: send ICMP message 'port unreachable' */
+        sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
+        send_icmp_message(sr, interface, icmp_dest_unreachable, icmp_port_unreachable,
+                        eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
     }
 }
 
@@ -127,6 +143,23 @@ static void forward_ip_packet(struct sr_instance *sr, uint8_t *packet,
             fprintf(stderr, "forward IP packet - not found ARP cache entry for %s\n",
                 inet_ntoa(rt_entry->gw));
 
+            struct sr_arpreq* arpreq = sr_arpcache_queuereq(&sr->cache, 
+                                rt_entry->gw.s_addr, tx_packet, len, rt_entry->interface);
+            free(tx_packet);
+
+            if (arpreq->times_sent > 5) {
+                fprintf(stderr, "forward IP packet - the ARP request to resolve %s \n"
+                    " was sent more than 5 times, drop all pending requests\n\n",
+                    inet_ntoa(rt_entry->gw));
+                sr_arpreq_destroy(&sr->cache, arpreq);
+
+                sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
+                iph = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+                send_icmp_message(sr, interface, icmp_dest_unreachable, icmp_host_unreachable,
+                                eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
+                return ;
+            }
+
             uint8_t arp_request[sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)] = { '\0'};
             memset(arp_request, 0, sizeof(arp_request));
 
@@ -137,16 +170,14 @@ static void forward_ip_packet(struct sr_instance *sr, uint8_t *packet,
             fprintf(stderr, " -- ARP request -- \n\n");
 
             sr_send_packet(sr, arp_request, sizeof(arp_request), rt_entry->interface);
-
-            sr_arpcache_queuereq(&sr->cache, rt_entry->gw.s_addr,
-                                tx_packet, len, rt_entry->interface);
-            free(tx_packet);
         }
 
         return;
     }
 
-    /* TO DO: send ICMP message 'destination net unreachable' (type: 3, code: 0)*/
+    sr_ethernet_hdr_t* eh = (sr_ethernet_hdr_t *)packet;
+    send_icmp_message(sr, interface, icmp_dest_unreachable, icmp_net_unreachable,
+                    eh->ether_dhost, iph->ip_dst, eh->ether_shost, iph->ip_src);
 }
 
 static struct sr_rt* lookup_rt_entry(struct sr_rt *table, uint32_t ipaddr)
